@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Hotspot Editor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📍 Image Hotspot Editor</h1>
+            <p>Upload an image and draw polygon hotspots on it</p>
+        </header>
+
+        <div class="toolbar">
+            <label for="imageUpload" class="btn btn-primary">
+                📁 Upload Image
+            </label>
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+            <button id="clearCanvas" class="btn btn-secondary">Clear Canvas</button>
+            <button id="toggleDrawing" class="btn btn-primary">Start Drawing</button>
+            <span id="drawingStatus" class="status">Not drawing</span>
+            <div class="toolbar-divider"></div>
+            <button id="downloadImage" class="btn btn-success">💾 Download Image</button>
+            <button id="exportEmbed" class="btn btn-primary">📤 Export Embed Code</button>
+        </div>
+
+        <div class="main-content">
+            <div class="canvas-container">
+                <canvas id="imageCanvas"></canvas>
+                <div id="instructions" class="instructions">
+                    <p>📤 Upload an image to get started</p>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <div class="hotspot-form">
+                    <h2>Add Hotspot</h2>
+                    <form id="hotspotForm">
+                        <div class="form-group">
+                            <label for="hotspotName">Name:</label>
+                            <input type="text" id="hotspotName" required placeholder="Enter hotspot name">
+                        </div>
+                        <div class="form-group">
+                            <label for="hotspotDescription">Description:</label>
+                            <textarea id="hotspotDescription" placeholder="Enter description (optional)"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="hotspotColor">Color:</label>
+                            <input type="color" id="hotspotColor" value="#ff0000">
+                        </div>
+                        <button type="submit" class="btn btn-success">Save Hotspot</button>
+                        <button type="button" id="cancelHotspot" class="btn btn-secondary">Cancel</button>
+                    </form>
+                </div>
+
+                <div class="hotspots-list">
+                    <h2>Hotspots</h2>
+                    <div id="hotspotsContainer">
+                        <p class="empty-state">No hotspots yet. Start drawing to create one!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Embed Code Modal -->
+    <div id="embedModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📤 Embeddable Hotspot Code</h2>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">Copy this code to embed your hotspot image on other websites:</p>
+                <div class="code-tabs">
+                    <button class="tab-btn active" data-tab="widget">JS Widget</button>
+                    <button class="tab-btn" data-tab="webcomponent">Web Component</button>
+                    <button class="tab-btn" data-tab="direct">Direct Embed</button>
+                    <button class="tab-btn" data-tab="iframe">iFrame</button>
+                    <button class="tab-btn" data-tab="download">Download HTML File</button>
+                </div>
+                <div class="code-container">
+                    <textarea id="embedCode" class="code-textarea" readonly></textarea>
+                    <button class="btn btn-primary btn-copy" id="copyCode">📋 Copy Code</button>
+                </div>
+                <div class="embed-preview">
+                    <h3>Preview:</h3>
+                    <div id="embedPreview"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
