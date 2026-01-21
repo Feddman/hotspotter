@@ -164,19 +164,19 @@ function toggleDrawing() {
     if (state.isDrawing) {
         state.currentPolygon = [];
         state.editingHotspotId = null;
-        toggleDrawingBtn.textContent = 'Stop Drawing';
+        toggleDrawingBtn.textContent = 'Stop met Tekenen';
         toggleDrawingBtn.classList.remove('btn-primary');
         toggleDrawingBtn.classList.add('btn-danger');
-        drawingStatus.textContent = 'Drawing mode: Click to add points';
+        drawingStatus.textContent = 'Tekenen modus: Klik om punten toe te voegen';
         drawingStatus.style.background = '#d4edda';
         drawingStatus.style.color = '#155724';
         canvas.style.cursor = 'crosshair';
         hotspotForm.style.display = 'none';
     } else {
-        toggleDrawingBtn.textContent = 'Start Drawing';
+        toggleDrawingBtn.textContent = 'Start met Tekenen';
         toggleDrawingBtn.classList.remove('btn-danger');
         toggleDrawingBtn.classList.add('btn-primary');
-        drawingStatus.textContent = 'Not drawing';
+        drawingStatus.textContent = 'Niet aan het tekenen';
         drawingStatus.style.background = '#e9ecef';
         drawingStatus.style.color = '#495057';
         canvas.style.cursor = 'default';
@@ -238,7 +238,7 @@ function saveHotspot(e) {
     e.preventDefault();
 
     if (state.currentPolygon.length < 3) {
-        alert('Please draw at least 3 points to create a hotspot');
+        alert('Teken minimaal 3 punten om een hotspot te maken');
         return;
     }
 
@@ -312,7 +312,7 @@ function editHotspot(id) {
 }
 
 function deleteHotspot(id) {
-    if (confirm('Are you sure you want to delete this hotspot?')) {
+    if (confirm('Weet je zeker dat je deze hotspot wilt verwijderen?')) {
         state.hotspots = state.hotspots.filter(h => h.id !== id);
         drawCanvas();
         renderHotspots();
@@ -322,7 +322,7 @@ function deleteHotspot(id) {
 
 function renderHotspots() {
     if (state.hotspots.length === 0) {
-        hotspotsContainer.innerHTML = '<p class="empty-state">No hotspots yet. Start drawing to create one!</p>';
+        hotspotsContainer.innerHTML = '<p class="empty-state">Nog geen hotspots. Begin met tekenen om er een te maken!</p>';
         return;
     }
 
@@ -331,8 +331,8 @@ function renderHotspots() {
             <h3>${escapeHtml(hotspot.name)}</h3>
             ${hotspot.description ? `<p>${escapeHtml(hotspot.description)}</p>` : ''}
             <div class="hotspot-actions">
-                <button class="btn btn-primary" onclick="editHotspot(${hotspot.id})">✏️ Edit</button>
-                <button class="btn btn-danger" onclick="deleteHotspot(${hotspot.id})">🗑️ Delete</button>
+                <button class="btn btn-primary" onclick="editHotspot(${hotspot.id})">✏️ Bewerken</button>
+                <button class="btn btn-danger" onclick="deleteHotspot(${hotspot.id})">🗑️ Verwijderen</button>
             </div>
         </div>
     `).join('');
@@ -346,16 +346,16 @@ function escapeHtml(text) {
 
 // Canvas clearing
 function clearCanvas() {
-    if (confirm('Are you sure you want to clear all hotspots?')) {
+    if (confirm('Weet je zeker dat je alle hotspots wilt wissen?')) {
         state.hotspots = [];
         state.currentPolygon = [];
         state.editingHotspotId = null;
         state.isDrawing = false;
         state.image = null;
-        toggleDrawingBtn.textContent = 'Start Drawing';
+        toggleDrawingBtn.textContent = 'Start met Tekenen';
         toggleDrawingBtn.classList.remove('btn-danger');
         toggleDrawingBtn.classList.add('btn-primary');
-        drawingStatus.textContent = 'Not drawing';
+        drawingStatus.textContent = 'Niet aan het tekenen';
         drawingStatus.style.background = '#e9ecef';
         drawingStatus.style.color = '#495057';
         canvas.style.cursor = 'default';
@@ -411,7 +411,7 @@ function loadFromLocalStorage() {
 // Download image with hotspots
 function downloadImage() {
     if (!state.image || state.hotspots.length === 0) {
-        alert('Please upload an image and create at least one hotspot first.');
+        alert('Upload eerst een afbeelding en maak minimaal één hotspot.');
         return;
     }
 
@@ -469,11 +469,11 @@ function drawPolygonOnCanvas(ctx, points, color, scaleX, scaleY) {
 // Embed code generation
 function showEmbedModal() {
     if (!state.image || state.hotspots.length === 0) {
-        alert('Please upload an image and create at least one hotspot first.');
+        alert('Upload eerst een afbeelding en maak minimaal één hotspot.');
         return;
     }
     embedModal.classList.add('show');
-    switchTab('widget');
+    switchTab('direct');
 }
 
 function closeEmbedModal() {
@@ -486,66 +486,9 @@ function switchTab(tabName) {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
 
-    // Generate and display code based on tab
-    let code = '';
-    let previewHtml = '';
-
-    if (tabName === 'widget') {
-        code = generateWidgetCode();
-        previewHtml = generateWidgetPreview();
-    } else if (tabName === 'webcomponent') {
-        code = generateWebComponentCode();
-        previewHtml = generateWebComponentPreview();
-    } else if (tabName === 'direct') {
-        code = generateDirectEmbedCode();
-        previewHtml = generateDirectEmbedPreview();
-    } else if (tabName === 'html') {
-        code = generateEmbedHTML();
-        previewHtml = code;
-    } else if (tabName === 'iframe') {
-        code = generateIframeCode();
-        const embedHtml = generateEmbedHTML();
-        // Show actual iframe in preview
-        const escapedHtml = embedHtml.replace(/"/g, '&quot;');
-        previewHtml = `<iframe style="width: 100%; height: 400px; border: 1px solid #ddd; border-radius: 8px;" srcdoc="${escapedHtml}"></iframe>`;
-    } else if (tabName === 'download') {
-        code = generateStandaloneHTML();
-        previewHtml = '<p style="color: #666;">Click "Download HTML File" to save a standalone HTML file that can be embedded anywhere.</p>';
-    }
-
+    // Generate direct embed code
+    const code = generateDirectEmbedCode();
     embedCodeTextarea.value = code;
-    embedPreview.innerHTML = previewHtml;
-
-    // Add download button for download tab
-    if (tabName === 'download') {
-        const codeContainer = document.querySelector('.code-container');
-        let downloadBtn = document.getElementById('downloadHtmlBtn');
-        if (!downloadBtn && codeContainer) {
-            downloadBtn = document.createElement('button');
-            downloadBtn.id = 'downloadHtmlBtn';
-            downloadBtn.className = 'btn btn-success btn-block';
-            downloadBtn.textContent = '📥 Download HTML File';
-            downloadBtn.style.marginTop = '10px';
-            downloadBtn.onclick = () => {
-                const html = generateStandaloneHTML();
-                const blob = new Blob([html], { type: 'text/html' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `hotspot-embed-${Date.now()}.html`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            };
-            codeContainer.appendChild(downloadBtn);
-        }
-    } else {
-        const downloadBtn = document.getElementById('downloadHtmlBtn');
-        if (downloadBtn) {
-            downloadBtn.remove();
-        }
-    }
 }
 
 function generateEmbedHTML() {
@@ -1004,35 +947,44 @@ function generateWebComponentPreview() {
 function generateDirectEmbedCode() {
     const hotspotData = getHotspotData();
     const imageData = getImageDataURL();
+    const embedId = Date.now();
     
-    const directCode = `<!-- Direct Hotspot Embed - Paste this directly in your HTML -->
-<div id="hotspot-direct-embed" style="position: relative; display: inline-block; max-width: 100%;"></div>
+    const directCode = `<!-- Direct Hotspot Insluiten - Plak dit direct in je HTML -->
+<div id="hotspot-direct-embed-${embedId}" style="position: relative; display: inline-block; max-width: 100%;"></div>
 <script>
 (function() {
-    const container = document.getElementById('hotspot-direct-embed');
+    const container = document.getElementById('hotspot-direct-embed-${embedId}');
+    // Prevent double rendering
+    if (!container || container.hasAttribute('data-rendered')) {
+        return;
+    }
+    container.setAttribute('data-rendered', 'true');
+    
     const data = ${JSON.stringify(hotspotData)};
     const imageSrc = ${JSON.stringify(imageData)};
+    // Construct SVG namespace URL to avoid auto-linking
+    const svgNS = String.fromCharCode(104, 116, 116, 112) + '://' + 'www' + String.fromCharCode(46) + 'w3' + String.fromCharCode(46) + 'org' + '/2000/svg';
     
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('width', data.imageWidth);
     svg.setAttribute('height', data.imageHeight);
-    svg.setAttribute('viewBox', \`0 0 \${data.imageWidth} \${data.imageHeight}\`);
+    svg.setAttribute('viewBox', '0 0 ' + data.imageWidth + ' ' + data.imageHeight);
     svg.style.maxWidth = '100%';
     svg.style.height = 'auto';
     svg.style.display = 'block';
     
-    const img = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    const img = document.createElementNS(svgNS, 'image');
     img.setAttribute('href', imageSrc);
     img.setAttribute('width', data.imageWidth);
     img.setAttribute('height', data.imageHeight);
     svg.appendChild(img);
     
     const tooltip = document.createElement('div');
-    tooltip.style.cssText = 'position: absolute; background: rgba(0,0,0,0.8); color: white; padding: 10px 15px; border-radius: 6px; pointer-events: none; display: none; font-size: 14px; z-index: 1000;';
+    tooltip.style.cssText = 'position: absolute; background: rgba(0,0,0,0.85); color: #ffffff; padding: 10px 15px; border-radius: 6px; pointer-events: none; display: none; font-size: 14px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);';
     
-    data.hotspots.forEach((hotspot) => {
-        const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-        const points = hotspot.points.map(p => \`\${p.x},\${p.y}\`).join(' ');
+    data.hotspots.forEach(function(hotspot) {
+        const poly = document.createElementNS(svgNS, 'polygon');
+        const points = hotspot.points.map(function(p) { return p.x + ',' + p.y; }).join(' ');
         poly.setAttribute('points', points);
         poly.setAttribute('fill', hotspot.color + '40');
         poly.setAttribute('stroke', hotspot.color);
@@ -1040,20 +992,20 @@ function generateDirectEmbedCode() {
         poly.style.cursor = 'pointer';
         poly.style.transition = 'opacity 0.3s';
         
-        poly.addEventListener('mouseenter', (e) => {
-            tooltip.innerHTML = '<h4 style="margin: 0 0 5px 0; font-size: 16px;">' + hotspot.name + '</h4>' + 
-                (hotspot.description ? '<p style="margin: 0; font-size: 12px; opacity: 0.9;">' + hotspot.description + '</p>' : '');
+        poly.addEventListener('mouseenter', function(e) {
+            tooltip.innerHTML = '<h4 style="margin: 0 0 5px 0; font-size: 16px; color: #ffffff; font-weight: 600;">' + hotspot.name + '</h4>' + 
+                (hotspot.description ? '<p style="margin: 0; font-size: 12px; color: #f0f0f0; opacity: 1;">' + hotspot.description + '</p>' : '');
             tooltip.style.display = 'block';
             poly.style.opacity = '0.7';
         });
         
-        poly.addEventListener('mousemove', (e) => {
+        poly.addEventListener('mousemove', function(e) {
             const rect = container.getBoundingClientRect();
             tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
             tooltip.style.top = (e.clientY - rect.top + 10) + 'px';
         });
         
-        poly.addEventListener('mouseleave', () => {
+        poly.addEventListener('mouseleave', function() {
             tooltip.style.display = 'none';
             poly.style.opacity = '1';
         });
@@ -1110,7 +1062,7 @@ function copyEmbedCode() {
     try {
         document.execCommand('copy');
         const originalText = copyCodeBtn.textContent;
-        copyCodeBtn.textContent = '✅ Copied!';
+        copyCodeBtn.textContent = '✅ Gekopieerd!';
         copyCodeBtn.style.background = '#28a745';
         setTimeout(() => {
             copyCodeBtn.textContent = originalText;
@@ -1120,14 +1072,14 @@ function copyEmbedCode() {
         // Fallback for modern browsers
         navigator.clipboard.writeText(embedCodeTextarea.value).then(() => {
             const originalText = copyCodeBtn.textContent;
-            copyCodeBtn.textContent = '✅ Copied!';
+            copyCodeBtn.textContent = '✅ Gekopieerd!';
             copyCodeBtn.style.background = '#28a745';
             setTimeout(() => {
                 copyCodeBtn.textContent = originalText;
                 copyCodeBtn.style.background = '';
             }, 2000);
         }).catch(() => {
-            alert('Failed to copy. Please select and copy manually.');
+            alert('Kopiëren mislukt. Selecteer en kopieer handmatig.');
         });
     }
 }
