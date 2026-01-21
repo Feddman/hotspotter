@@ -9,8 +9,8 @@
 <body>
     <div class="container">
         <header>
-            <h1>📍 Afbeelding Hotspot Editor</h1>
-            <p>Upload een afbeelding en teken polygon hotspots erop</p>
+            <h1>Curio Hotspot Editor</h1>
+            <p>Upload een afbeelding en maak hotspots aan op de afbeelding </p>
         </header>
 
         <div class="toolbar">
@@ -22,7 +22,6 @@
             <button id="toggleDrawing" class="btn btn-primary">Start met Tekenen</button>
             <span id="drawingStatus" class="status">Niet aan het tekenen</span>
             <div class="toolbar-divider"></div>
-            <button id="downloadImage" class="btn btn-success">💾 Afbeelding Downloaden</button>
             <button id="exportEmbed" class="btn btn-primary">📤 Embed Code Exporteren</button>
         </div>
 
@@ -73,10 +72,25 @@
                 <button class="modal-close" id="closeModal">&times;</button>
             </div>
             <div class="modal-body">
-                <p class="modal-description">Kopieer deze code om je hotspot afbeelding op andere websites in te sluiten:</p>
-                <div class="code-tabs">
-                    <button class="tab-btn active" data-tab="direct">Direct Insluiten</button>
+                <div class="file-name-section" style="margin-bottom: 20px;">
+                    <label for="fileName" style="display: block; margin-bottom: 8px; font-weight: 500;">Bestandsnaam:</label>
+                    <input type="text" id="fileName" required placeholder="voer bestandsnaam in" style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 14px;">
+                    <button class="btn btn-success" id="generateFile" style="margin-top: 10px; width: 100%;">💾 HTML Bestand Opslaan op Server</button>
                 </div>
+                <div class="embed-options" style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Type:</label>
+                    <div style="display: flex; gap: 15px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="embedType" value="iframe" style="margin-right: 6px;">
+                            <span>Iframe Embed Code</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="embedType" value="url" checked style="margin-right: 6px;">
+                            <span>Alleen URL</span>
+                        </label>
+                    </div>
+                </div>
+                <p class="modal-description">Kopieer deze code om je hotspot afbeelding op andere websites in te sluiten:</p>
                 <div class="code-container">
                     <textarea id="embedCode" class="code-textarea" readonly></textarea>
                     <button class="btn btn-primary btn-copy" id="copyCode">📋 Code Kopiëren</button>

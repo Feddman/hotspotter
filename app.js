@@ -21,7 +21,6 @@ const hotspotColorInput = document.getElementById('hotspotColor');
 const cancelHotspotBtn = document.getElementById('cancelHotspot');
 const hotspotsContainer = document.getElementById('hotspotsContainer');
 const instructions = document.getElementById('instructions');
-const downloadImageBtn = document.getElementById('downloadImage');
 const exportEmbedBtn = document.getElementById('exportEmbed');
 const embedModal = document.getElementById('embedModal');
 const closeModalBtn = document.getElementById('closeModal');
@@ -29,6 +28,8 @@ const embedCodeTextarea = document.getElementById('embedCode');
 const copyCodeBtn = document.getElementById('copyCode');
 const embedPreview = document.getElementById('embedPreview');
 const tabButtons = document.querySelectorAll('.tab-btn');
+const fileNameInput = document.getElementById('fileName');
+const generateFileBtn = document.getElementById('generateFile');
 
 // Initialize
 loadFromLocalStorage();
@@ -41,10 +42,12 @@ hotspotForm.addEventListener('submit', saveHotspot);
 cancelHotspotBtn.addEventListener('click', cancelHotspot);
 canvas.addEventListener('click', handleCanvasClick);
 canvas.addEventListener('mousemove', handleCanvasMouseMove);
-downloadImageBtn.addEventListener('click', downloadImage);
 exportEmbedBtn.addEventListener('click', showEmbedModal);
 closeModalBtn.addEventListener('click', closeEmbedModal);
 copyCodeBtn.addEventListener('click', copyEmbedCode);
+if (generateFileBtn) {
+    generateFileBtn.addEventListener('click', generateAndDownloadFile);
+}
 tabButtons.forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
@@ -114,16 +117,55 @@ function drawCanvas() {
 
     // Draw all hotspots
     state.hotspots.forEach((hotspot, index) => {
-        drawPolygon(hotspot.points, hotspot.color, index === state.editingHotspotId);
+        if (!hotspot.points || hotspot.points.length === 0) {
+            return;
+        }
+        // Button hotspots are stored as circle polygons, so always draw as polygon
+        drawPolygon(hotspot.points, hotspot.color, hotspot.id === state.editingHotspotId, false, false);
     });
 
     // Draw current polygon being drawn
     if (state.currentPolygon.length > 0) {
-        drawPolygon(state.currentPolygon, hotspotColorInput.value, false, true);
+        const isButton = state.currentPolygon.length === 1;
+        drawPolygon(state.currentPolygon, hotspotColorInput.value, false, true, isButton);
     }
 }
 
-function drawPolygon(points, color, isEditing = false, isDrawing = false) {
+function drawPolygon(points, color, isEditing = false, isDrawing = false, isButton = false) {
+    if (!points || points.length < 1) return;
+
+    // Draw button hotspot (single point as circle)
+    if (isButton || points.length === 1) {
+        const point = points[0];
+        if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') {
+            console.warn('Invalid point for button hotspot:', point, 'points array:', points);
+            return;
+        }
+        const radius = 20;
+        
+        // Fill circle
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color + '60'; // More opaque for buttons
+        ctx.fill();
+        
+        // Stroke circle
+        ctx.strokeStyle = color;
+        ctx.lineWidth = isEditing ? 4 : 3;
+        ctx.stroke();
+        
+        // Draw center point
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        return;
+    }
+
+    // Draw polygon (multiple points)
     if (points.length < 2) return;
 
     ctx.beginPath();
@@ -190,11 +232,34 @@ function handleCanvasClick(e) {
     if (!state.isDrawing || !state.image) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+
+    // If Shift is pressed, constrain to horizontal, vertical, or diagonal from last point
+    if (e.shiftKey && state.currentPolygon.length > 0) {
+        const lastPoint = state.currentPolygon[state.currentPolygon.length - 1];
+        const dx = x - lastPoint.x;
+        const dy = y - lastPoint.y;
+        const angle = Math.atan2(dy, dx);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Constrain to 0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°
+        const constrainedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        
+        x = lastPoint.x + Math.cos(constrainedAngle) * distance;
+        y = lastPoint.y + Math.sin(constrainedAngle) * distance;
+    }
 
     state.currentPolygon.push({ x, y });
     drawCanvas();
+
+    // For single point (button hotspot), show form immediately after first click
+    if (state.currentPolygon.length === 1) {
+        // Allow saving as button hotspot
+        hotspotForm.style.display = 'block';
+        hotspotNameInput.focus();
+        return;
+    }
 
     // If polygon is closed (clicked near first point), show form
     if (state.currentPolygon.length > 2) {
@@ -214,8 +279,23 @@ function handleCanvasMouseMove(e) {
     if (!state.isDrawing || !state.image || state.currentPolygon.length === 0) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+
+    // If Shift is pressed, constrain to horizontal, vertical, or diagonal
+    if (e.shiftKey && state.currentPolygon.length > 0) {
+        const lastPoint = state.currentPolygon[state.currentPolygon.length - 1];
+        const dx = x - lastPoint.x;
+        const dy = y - lastPoint.y;
+        const angle = Math.atan2(dy, dx);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // Constrain to 0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°
+        const constrainedAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+        
+        x = lastPoint.x + Math.cos(constrainedAngle) * distance;
+        y = lastPoint.y + Math.sin(constrainedAngle) * distance;
+    }
 
     // Redraw with preview line
     drawCanvas();
@@ -237,9 +317,27 @@ function handleCanvasMouseMove(e) {
 function saveHotspot(e) {
     e.preventDefault();
 
-    if (state.currentPolygon.length < 3) {
-        alert('Teken minimaal 3 punten om een hotspot te maken');
+    // Allow saving with 1 point (button) or 3+ points (polygon)
+    if (state.currentPolygon.length < 1) {
+        alert('Voeg minimaal 1 punt toe voor een button hotspot of 3 punten voor een polygon hotspot');
         return;
+    }
+
+    // If single point (button), create a circle polygon instead
+    let pointsToSave = [...state.currentPolygon];
+    if (state.currentPolygon.length === 1) {
+        // Create circle polygon with 16 points around the center
+        const center = state.currentPolygon[0];
+        const radius = 20;
+        const numPoints = 16;
+        pointsToSave = [];
+        for (let i = 0; i < numPoints; i++) {
+            const angle = (i / numPoints) * Math.PI * 2;
+            pointsToSave.push({
+                x: center.x + Math.cos(angle) * radius,
+                y: center.y + Math.sin(angle) * radius
+            });
+        }
     }
 
     const hotspot = {
@@ -247,7 +345,8 @@ function saveHotspot(e) {
         name: hotspotNameInput.value,
         description: hotspotDescInput.value,
         color: hotspotColorInput.value,
-        points: [...state.currentPolygon]
+        points: pointsToSave,
+        type: state.currentPolygon.length === 1 ? 'button' : 'polygon'
     };
 
     if (state.editingHotspotId !== null) {
@@ -303,7 +402,17 @@ function editHotspot(id) {
     if (!hotspot) return;
 
     state.editingHotspotId = id;
-    state.currentPolygon = [...hotspot.points];
+    
+    // If button hotspot (type === 'button'), convert circle polygon back to single point (center)
+    if (hotspot.type === 'button' && hotspot.points && hotspot.points.length > 1) {
+        // Calculate center of circle polygon
+        const centerX = hotspot.points.reduce((sum, p) => sum + p.x, 0) / hotspot.points.length;
+        const centerY = hotspot.points.reduce((sum, p) => sum + p.y, 0) / hotspot.points.length;
+        state.currentPolygon = [{ x: centerX, y: centerY }];
+    } else {
+        state.currentPolygon = [...hotspot.points];
+    }
+    
     hotspotNameInput.value = hotspot.name;
     hotspotDescInput.value = hotspot.description || '';
     hotspotColorInput.value = hotspot.color;
@@ -430,7 +539,8 @@ function downloadImage() {
 
     // Draw all hotspots scaled to original image size
     state.hotspots.forEach(hotspot => {
-        drawPolygonOnCanvas(tempCtx, hotspot.points, hotspot.color, scaleX, scaleY);
+        const isButton = hotspot.type === 'button' || (hotspot.points && hotspot.points.length === 1);
+        drawPolygonOnCanvas(tempCtx, hotspot.points, hotspot.color, scaleX, scaleY, isButton);
     });
 
     // Download the image
@@ -473,7 +583,7 @@ function showEmbedModal() {
         return;
     }
     embedModal.classList.add('show');
-    switchTab('direct');
+    updateIframeEmbedCode();
 }
 
 function closeEmbedModal() {
@@ -490,6 +600,300 @@ function switchTab(tabName) {
     const code = generateDirectEmbedCode();
     embedCodeTextarea.value = code;
 }
+
+function updateIframeEmbedCode(savedUrl = null) {
+    let libraryUrl;
+    
+    if (savedUrl) {
+        // Use the URL from server response
+        libraryUrl = savedUrl;
+    } else {
+        // Construct URL from filename - required field
+        const fileName = fileNameInput.value.trim();
+        if (!fileName) {
+            embedCodeTextarea.value = '';
+            embedPreview.innerHTML = '<p style="color: #dc3545; padding: 15px;">Voer een bestandsnaam in om de embed code te zien.</p>';
+            return;
+        }
+        // Clean filename but preserve the name structure
+        let cleanFileName = fileName.replace(/[^a-z0-9-_.]/gi, '-');
+        // Remove multiple consecutive dashes
+        cleanFileName = cleanFileName.replace(/-+/g, '-');
+        // Remove leading/trailing dashes
+        cleanFileName = cleanFileName.replace(/^-+|-+$/g, '');
+        // Ensure .html extension
+        const finalFileName = cleanFileName.endsWith('.html') ? cleanFileName : cleanFileName + '.html';
+        // Use full document root URL including the current directory (e.g., /hotspotter)
+        const baseUrl = window.location.origin + window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+        libraryUrl = baseUrl + '/library/' + finalFileName;
+    }
+    
+    // Check which embed type is selected
+    const embedType = document.querySelector('input[name="embedType"]:checked').value;
+    
+    // Check if file exists before showing preview
+    if (savedUrl) {
+        // File was just saved, show preview
+        const iframeCode = `<iframe src="${libraryUrl}" width="100%" height="600" frameborder="0" style="border: 1px solid #ddd; border-radius: 8px; min-height: 400px;"></iframe>`;
+        
+        if (embedType === 'url') {
+            embedCodeTextarea.value = libraryUrl;
+        } else {
+            embedCodeTextarea.value = iframeCode;
+        }
+        
+        embedPreview.innerHTML = `<div style="padding: 15px; background: #f8f9fa; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: 500;">Voorbeeld:</p>
+            <div style="border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
+                ${iframeCode}
+            </div>
+        </div>`;
+    } else {
+        // File not saved yet, check if it exists
+        if (embedType === 'url') {
+            embedCodeTextarea.value = libraryUrl;
+        } else {
+            const iframeCode = `<iframe src="${libraryUrl}" width="100%" height="600" frameborder="0" style="border: 1px solid #ddd; border-radius: 8px; min-height: 400px;"></iframe>`;
+            embedCodeTextarea.value = iframeCode;
+        }
+        
+        // Check if file exists by trying to fetch it
+        fetch(libraryUrl, { method: 'HEAD' })
+            .then(response => {
+                if (response.ok) {
+                    // File exists, show preview
+                    const iframeCode = `<iframe src="${libraryUrl}" width="100%" height="600" frameborder="0" style="border: 1px solid #ddd; border-radius: 8px; min-height: 400px;"></iframe>`;
+                    embedPreview.innerHTML = `<div style="padding: 15px; background: #f8f9fa; border-radius: 4px;">
+                        <p style="margin: 0 0 10px 0; font-weight: 500;">Voorbeeld:</p>
+                        <div style="border: 1px solid #ddd; border-radius: 4px; overflow: hidden;">
+                            ${iframeCode}
+                        </div>
+                    </div>`;
+                } else {
+                    // File doesn't exist yet
+                    embedPreview.innerHTML = `<div style="padding: 15px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                        <p style="margin: 0; color: #856404;">⚠️ Het HTML-bestand moet eerst worden opgeslagen voordat het voorbeeld kan worden getoond.</p>
+                        <p style="margin: 10px 0 0 0; font-size: 12px; color: #856404;">Klik op "HTML Bestand Opslaan op Server" om het bestand op te slaan.</p>
+                    </div>`;
+                }
+            })
+            .catch(error => {
+                // File doesn't exist or error checking
+                embedPreview.innerHTML = `<div style="padding: 15px; background: #fff3cd; border-radius: 4px; border: 1px solid #ffc107;">
+                    <p style="margin: 0; color: #856404;">⚠️ Het HTML-bestand moet eerst worden opgeslagen voordat het voorbeeld kan worden getoond.</p>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #856404;">Klik op "HTML Bestand Opslaan op Server" om het bestand op te slaan.</p>
+                </div>`;
+            });
+    }
+}
+
+function generateAndDownloadFile() {
+    if (!state.image || state.hotspots.length === 0) {
+        alert('Upload eerst een afbeelding en maak minimaal één hotspot.');
+        return;
+    }
+
+    const fileName = fileNameInput.value.trim();
+    if (!fileName) {
+        alert('Voer een bestandsnaam in voordat je het bestand opslaat.');
+        fileNameInput.focus();
+        return;
+    }
+    // Clean filename but preserve the name structure
+    let cleanFileName = fileName.replace(/[^a-z0-9-_.]/gi, '-');
+    // Remove multiple consecutive dashes
+    cleanFileName = cleanFileName.replace(/-+/g, '-');
+    // Remove leading/trailing dashes
+    cleanFileName = cleanFileName.replace(/^-+|-+$/g, '');
+    // Ensure .html extension
+    if (!cleanFileName.endsWith('.html')) {
+        cleanFileName = cleanFileName + '.html';
+    }
+
+    // Generate standalone HTML file
+    const htmlContent = generateStandaloneHTMLFile();
+    
+    // Disable button during save
+    generateFileBtn.disabled = true;
+    const originalText = generateFileBtn.textContent;
+    generateFileBtn.textContent = 'Opslaan...';
+    
+    // Function to save file (can be called with overwrite flag)
+    function saveFileToServer(overwrite = false) {
+        fetch('save_file.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                filename: cleanFileName,
+                content: htmlContent,
+                overwrite: overwrite
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update embed code with the saved file URL (now includes full document root)
+                updateIframeEmbedCode(data.url);
+                
+                // Show success message
+                const successMsg = data.overwritten ? '✅ Bestand Overschreven!' : '✅ Bestand Opgeslagen!';
+                generateFileBtn.textContent = successMsg;
+                generateFileBtn.style.background = '#28a745';
+                setTimeout(() => {
+                    generateFileBtn.textContent = originalText;
+                    generateFileBtn.style.background = '';
+                    generateFileBtn.disabled = false;
+                }, 2000);
+            } else if (data.fileExists) {
+                // File already exists, ask user if they want to overwrite
+                if (confirm(`Het bestand "${data.filename}" bestaat al. Wil je de oude afbeelding overschrijven?`)) {
+                    // User confirmed, save with overwrite flag
+                    saveFileToServer(true);
+                } else {
+                    // User cancelled, re-enable button
+                    generateFileBtn.disabled = false;
+                    generateFileBtn.textContent = originalText;
+                    generateFileBtn.style.background = '';
+                }
+            } else {
+                throw new Error(data.error || 'Fout bij opslaan');
+            }
+        })
+        .catch(error => {
+            alert('Fout bij opslaan: ' + error.message);
+            generateFileBtn.textContent = originalText;
+            generateFileBtn.style.background = '';
+            generateFileBtn.disabled = false;
+        });
+    }
+    
+    // Start saving (without overwrite first)
+    saveFileToServer(false);
+}
+
+function generateStandaloneHTMLFile() {
+    const hotspotData = getHotspotData();
+    const imageData = getImageDataURL();
+    const embedId = Date.now();
+    
+    return `<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotspot Afbeelding</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .hotspot-container {
+            position: relative;
+            display: inline-block;
+            max-width: 100%;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="hotspot-direct-embed-${embedId}" class="hotspot-container"></div>
+    <script>
+(function() {
+    const container = document.getElementById('hotspot-direct-embed-${embedId}');
+    // Prevent double rendering
+    if (!container || container.hasAttribute('data-rendered')) {
+        return;
+    }
+    container.setAttribute('data-rendered', 'true');
+    
+    const data = ${JSON.stringify(hotspotData)};
+    const imageSrc = ${JSON.stringify(imageData)};
+    // Construct SVG namespace URL to avoid auto-linking
+    const svgNS = String.fromCharCode(104, 116, 116, 112) + '://' + 'www' + String.fromCharCode(46) + 'w3' + String.fromCharCode(46) + 'org' + '/2000/svg';
+    
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('width', data.imageWidth);
+    svg.setAttribute('height', data.imageHeight);
+    svg.setAttribute('viewBox', '0 0 ' + data.imageWidth + ' ' + data.imageHeight);
+    svg.style.maxWidth = '100%';
+    svg.style.height = 'auto';
+    svg.style.display = 'block';
+    
+    const img = document.createElementNS(svgNS, 'image');
+    img.setAttribute('href', imageSrc);
+    img.setAttribute('width', data.imageWidth);
+    img.setAttribute('height', data.imageHeight);
+    svg.appendChild(img);
+    
+    const tooltip = document.createElement('div');
+    tooltip.style.cssText = 'position: absolute; background: rgba(0,0,0,0.85); color: #ffffff; padding: 10px 15px; border-radius: 6px; pointer-events: none; display: none; font-size: 14px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3);';
+    
+    data.hotspots.forEach(function(hotspot) {
+        const poly = document.createElementNS(svgNS, 'polygon');
+        const points = hotspot.points.map(function(p) { return p.x + ',' + p.y; }).join(' ');
+        poly.setAttribute('points', points);
+        poly.setAttribute('fill', hotspot.color + '40');
+        poly.setAttribute('stroke', hotspot.color);
+        poly.setAttribute('stroke-width', '2');
+        poly.style.cursor = 'pointer';
+        poly.style.transition = 'opacity 0.3s';
+        
+        poly.addEventListener('mouseenter', function(e) {
+            tooltip.innerHTML = '<h4 style="margin: 0 0 5px 0; font-size: 16px; color: #ffffff; font-weight: 600;">' + hotspot.name + '</h4>' + 
+                (hotspot.description ? '<p style="margin: 0; font-size: 12px; color: #f0f0f0; opacity: 1;">' + hotspot.description + '</p>' : '');
+            tooltip.style.display = 'block';
+            poly.style.opacity = '0.7';
+        });
+        
+        poly.addEventListener('mousemove', function(e) {
+            const rect = container.getBoundingClientRect();
+            tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+            tooltip.style.top = (e.clientY - rect.top + 10) + 'px';
+        });
+        
+        poly.addEventListener('mouseleave', function() {
+            tooltip.style.display = 'none';
+            poly.style.opacity = '1';
+        });
+        
+        svg.appendChild(poly);
+    });
+    
+    container.appendChild(svg);
+    container.appendChild(tooltip);
+})();
+    </script>
+</body>
+</html>`;
+}
+
+// Update iframe code when filename changes
+if (fileNameInput) {
+    fileNameInput.addEventListener('input', () => updateIframeEmbedCode());
+}
+
+// Listen for embed type changes - use event delegation to avoid issues
+document.addEventListener('change', (e) => {
+    if (e.target && e.target.name === 'embedType') {
+        updateIframeEmbedCode();
+    }
+});
 
 function generateEmbedHTML() {
     // Get image as data URL
