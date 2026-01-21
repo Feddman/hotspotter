@@ -1056,21 +1056,11 @@ function getImageDataURL() {
 }
 
 function copyEmbedCode() {
-    embedCodeTextarea.select();
-    embedCodeTextarea.setSelectionRange(0, 99999); // For mobile devices
-
-    try {
-        document.execCommand('copy');
-        const originalText = copyCodeBtn.textContent;
-        copyCodeBtn.textContent = '✅ Gekopieerd!';
-        copyCodeBtn.style.background = '#28a745';
-        setTimeout(() => {
-            copyCodeBtn.textContent = originalText;
-            copyCodeBtn.style.background = '';
-        }, 2000);
-    } catch (err) {
-        // Fallback for modern browsers
-        navigator.clipboard.writeText(embedCodeTextarea.value).then(() => {
+    const textToCopy = embedCodeTextarea.value;
+    
+    // Use modern Clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(textToCopy).then(() => {
             const originalText = copyCodeBtn.textContent;
             copyCodeBtn.textContent = '✅ Gekopieerd!';
             copyCodeBtn.style.background = '#28a745';
@@ -1079,8 +1069,34 @@ function copyEmbedCode() {
                 copyCodeBtn.style.background = '';
             }, 2000);
         }).catch(() => {
-            alert('Kopiëren mislukt. Selecteer en kopieer handmatig.');
+            // Fallback to execCommand
+            fallbackCopy(textToCopy);
         });
+    } else {
+        // Fallback for older browsers
+        fallbackCopy(textToCopy);
+    }
+}
+
+function fallbackCopy(text) {
+    embedCodeTextarea.select();
+    embedCodeTextarea.setSelectionRange(0, text.length);
+    
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            const originalText = copyCodeBtn.textContent;
+            copyCodeBtn.textContent = '✅ Gekopieerd!';
+            copyCodeBtn.style.background = '#28a745';
+            setTimeout(() => {
+                copyCodeBtn.textContent = originalText;
+                copyCodeBtn.style.background = '';
+            }, 2000);
+        } else {
+            throw new Error('execCommand failed');
+        }
+    } catch (err) {
+        alert('Kopiëren mislukt. Selecteer en kopieer handmatig.');
     }
 }
 
